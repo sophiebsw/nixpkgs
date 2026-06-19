@@ -1,75 +1,74 @@
 {
-  stdenv,
   lib,
-  fetchurl,
   testers,
+  buildGoModule,
+  fetchFromGitHub,
   installShellFiles,
+  nix-update-script,
 }:
 
-# this expression is mostly automated, and you are STRONGLY
-# RECOMMENDED to use to nix-update for updating this expression when new
-# releases come out, which runs the sibling `update.sh` script.
-#
-# from the root of the nixpkgs git repository, run:
-#
-#    nix-shell maintainers/scripts/update.nix \
-#      --arg commit true \
-#      --argstr package infisical
-
-let
-  # build hashes, which correspond to the hashes of the precompiled binaries procured by GitHub Actions.
-  buildHashes = builtins.fromJSON (builtins.readFile ./hashes.json);
-
-  # the version of infisical
-  version = "0.43.110";
-
-  # the platform-specific, statically linked binary
-  src =
-    let
-      suffix =
-        {
-          # map the platform name to the golang toolchain suffix
-          # NOTE: must be synchronized with update.sh!
-          x86_64-linux = "linux_amd64";
-          aarch64-linux = "linux_arm64";
-          aarch64-darwin = "darwin_arm64";
-        }
-        ."${stdenv.hostPlatform.system}" or (throw "Unsupported system: ${stdenv.hostPlatform.system}");
-
-      name = "cli_${version}_${suffix}.tar.gz";
-      hash = buildHashes."${stdenv.hostPlatform.system}";
-      url = "https://github.com/Infisical/cli/releases/download/v${version}/${name}";
-    in
-    fetchurl { inherit name url hash; };
-
-in
-stdenv.mkDerivation (finalAttrs: {
+buildGoModule (finalAttrs: {
   pname = "infisical";
-  version = version;
-  inherit src;
+  version = "0.43.121";
+
+  src = fetchFromGitHub {
+    owner = "infisical";
+    repo = "cli";
+    tag = "v${finalAttrs.version}";
+    hash = "sha256-YQEftG6MHnM16ccL7+6d7Hds4hWIcR1kfMFJZs8fWAU=";
+  };
+
+  vendorHash = "sha256-XUqaPM5Rgzm2iyMbpb8okxjmVN9r7tR/m2BCA3Uo4dI=";
+
+  ldflags = [
+    "-X github.com/Infisical/infisical-merge/packages/util.CLI_VERSION=${finalAttrs.version}"
+    "-extldflags \"-static\""
+  ];
+
+  tags = [
+    # "rdp"
+    "osusergo"
+    "netgo"
+  ];
+
+  env.CGO_ENABLED = 0;
+
+  subPackages = [
+    "."
+    "packages/*"
+  ];
 
   nativeBuildInputs = [ installShellFiles ];
 
-  doCheck = true;
-  dontConfigure = true;
-  dontStrip = true;
-
-  sourceRoot = ".";
-  buildPhase = "chmod +x ./infisical";
-  checkPhase = "./infisical --version";
-  installPhase = ''
-    mkdir -p $out/bin/ $out/share/completions/ $out/share/man/
-    cp infisical $out/bin
-    cp completions/* $out/share/completions/
-    cp manpages/* $out/share/man/
+  postBuild = ''
+    mv $GOPATH/bin/infisical-merge $GOPATH/bin/infisical
   '';
+
+  # infisical cli tests require credentials, we can only run the smoke test
+  checkPhase = ''
+    runHook preCheck
+    PATH=$PATH:$GOPATH/bin sh ./smoke-tests/smoke.sh
+    runHook postCheck
+  '';
+
   postInstall = ''
-    installManPage share/man/infisical.1.gz
-    installShellCompletion share/completions/infisical.{bash,fish,zsh}
+    mkdir -p $out/share/man
+
+    $out/bin/infisical man | gzip > $out/share/man/infisical.1.gz
+
+    installManPage $out/share/man/infisical.1.gz
+
+    mkdir -p $out/share/completions
+
+    for shell in bash fish zsh; do
+      $out/bin/infisical completion $shell > $out/share/completions/infisical.$shell
+    done
+
+    installShellCompletion $out/share/completions/infisical.{bash,fish,zsh}
   '';
 
   passthru = {
-    updateScript = ./update.sh;
+    updateScript = nix-update-script { };
     tests.version = testers.testVersion { package = finalAttrs.finalPackage; };
   };
 
@@ -80,7 +79,7 @@ stdenv.mkDerivation (finalAttrs: {
       Sync secrets across your team/infrastructure and prevent secret leaks.
     '';
     homepage = "https://infisical.com";
-    changelog = "https://github.com/Infisical/cli/releases/tag/v${version}";
+    changelog = "https://github.com/Infisical/cli/releases/tag/v${finalAttrs.version}";
     license = lib.licenses.mit;
     mainProgram = "infisical";
     maintainers = with lib.maintainers; [ hausken ];
