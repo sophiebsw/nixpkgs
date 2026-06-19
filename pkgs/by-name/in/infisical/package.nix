@@ -1,12 +1,15 @@
 {
   lib,
+  stdenv,
   testers,
   buildGoModule,
+  rustPlatform,
   fetchFromGitHub,
   installShellFiles,
   nix-update-script,
+  # whether to build the rdp-bridge submodule, requires CGO and pkgsStatic for static linking or the tests will fail
+  withRDPBridge ? stdenv.hostPlatform.isStatic,
 }:
-
 buildGoModule (finalAttrs: {
   pname = "infisical";
   version = "0.43.121";
@@ -20,18 +23,27 @@ buildGoModule (finalAttrs: {
 
   vendorHash = "sha256-XUqaPM5Rgzm2iyMbpb8okxjmVN9r7tR/m2BCA3Uo4dI=";
 
+  rdp-bridge = lib.optionalDrvAttr withRDPBridge (rustPlatform.buildRustPackage {
+    inherit (finalAttrs) version;
+
+    pname = "infisical-rdp-bridge";
+    src = "${finalAttrs.src}/packages/pam/handlers/rdp/native";
+
+    cargoHash = "sha256-TPGt61WrgtyWC8EA0NjVRZorHQQcTmwtE7sQlaIAu9I=";
+  });
+
   ldflags = [
     "-X github.com/Infisical/infisical-merge/packages/util.CLI_VERSION=${finalAttrs.version}"
     "-extldflags \"-static\""
   ];
 
   tags = [
-    # "rdp"
     "osusergo"
     "netgo"
-  ];
+  ]
+  ++ lib.lists.optional withRDPBridge "rdp";
 
-  env.CGO_ENABLED = 0;
+  env.CGO_ENABLED = if withRDPBridge then 1 else 0;
 
   subPackages = [
     "."
@@ -39,6 +51,8 @@ buildGoModule (finalAttrs: {
   ];
 
   nativeBuildInputs = [ installShellFiles ];
+
+  buildInputs = [ finalAttrs.rdp-bridge ];
 
   postBuild = ''
     mv $GOPATH/bin/infisical-merge $GOPATH/bin/infisical
@@ -68,7 +82,12 @@ buildGoModule (finalAttrs: {
   '';
 
   passthru = {
-    updateScript = nix-update-script { };
+    updateScript = nix-update-script {
+      extraArgs = [
+        "--subpackage"
+        "rdp-bridge"
+      ];
+    };
     tests.version = testers.testVersion { package = finalAttrs.finalPackage; };
   };
 
