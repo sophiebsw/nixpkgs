@@ -10978,6 +10978,9 @@ with pkgs;
       plugins = lib.importJSON ../servers/web-apps/wordpress/packages/plugins.json;
       themes = lib.importJSON ../servers/web-apps/wordpress/packages/themes.json;
       languages = lib.importJSON ../servers/web-apps/wordpress/packages/languages.json;
+      pluginLicenses = lib.importJSON ../servers/web-apps/wordpress/packages/wordpress-plugins.json;
+      themeLicenses = lib.importJSON ../servers/web-apps/wordpress/packages/wordpress-themes.json;
+      languageLicenses = lib.importJSON ../servers/web-apps/wordpress/packages/wordpress-languages.json;
     }
   );
 
