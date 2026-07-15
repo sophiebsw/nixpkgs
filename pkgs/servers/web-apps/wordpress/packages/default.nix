@@ -8,6 +8,9 @@
   plugins,
   themes,
   languages,
+  pluginLicenses,
+  themeLicenses,
+  languageLicenses,
   callPackage,
 }:
 
@@ -18,12 +21,12 @@ let
       generatedJson = {
         inherit plugins themes languages;
       };
-      sourceJson = {
-        plugins = builtins.fromJSON (builtins.readFile ./wordpress-plugins.json);
-        themes = builtins.fromJSON (builtins.readFile ./wordpress-themes.json);
-        languages = builtins.fromJSON (builtins.readFile ./wordpress-languages.json);
-      };
 
+      sourceJson = {
+        plugins = pluginLicenses;
+        themes = themeLicenses;
+        languages = languageLicenses;
+      };
     in
     {
       # Create a generic WordPress package. Most arguments are just passed
