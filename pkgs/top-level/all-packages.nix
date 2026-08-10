@@ -5244,6 +5244,8 @@ with pkgs;
 
   portableService = callPackage ../build-support/portable-service { };
 
+  properdocs = with python3Packages; toPythonApplication properdocs;
+
   pyprof2calltree = with python3Packages; toPythonApplication pyprof2calltree;
 
   premake4 = callPackage ../development/tools/misc/premake { };

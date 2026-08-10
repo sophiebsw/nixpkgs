@@ -13742,6 +13742,13 @@ self: super: with self; {
 
   propcache = callPackage ../development/python-modules/propcache { };
 
+  properdocs = callPackage ../development/python-modules/properdocs { };
+
+  inherit (callPackage ../development/python-modules/properdocs/themes.nix { })
+    properdocs-theme-mkdocs
+    properdocs-theme-readthedocs
+    ;
+
   property-cached = callPackage ../development/python-modules/property-cached { };
 
   property-manager = callPackage ../development/python-modules/property-manager { };
